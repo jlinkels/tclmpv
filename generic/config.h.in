@@ -1,0 +1,7 @@
+#ifndef _TCLMPV_CONFIG_H
+#define _TCLMPV_CONFIG_H
+
+#define TCLMPV_PKGNAME		"@PACKAGE_NAME@"
+#define TCLMPV_PKGVERSION	"@PACKAGE_VERSION@"
+
+#endif
