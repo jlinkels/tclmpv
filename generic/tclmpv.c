@@ -277,18 +277,27 @@ mpvMediaCmd (
   Tcl_Obj * const objv[]
   )
 {
-  int               rc;
-  int               status, lstatus, sstatus;
-  mpvData_t         *mpvData = (mpvData_t *) cd;
-  char              *fn;
-	char			*stt;
-  struct stat       statinfo;
-  double            dval;
+	int			status;
+	mpvData_t	*mpvData = (mpvData_t *) cd;
+	char		*fn;
+	struct stat	statinfo;
+	double		dval;
+	char		errmsg[256];
 
-  if (objc < 2) {
-    Tcl_WrongNumArgs(interp, 1, objv, "media");
-    return TCL_ERROR;
-  }
+	/*
+	* This function can only be used to load media files which can be found on the
+	* file system. No http streams etc.
+	* When the file does not exist the function returns an error.
+	* The rquested file is loaded and replaces the currently playing file. No other
+	* options can be passed.
+	*/
+
+	RETURN_IF_NOT_INIT (mpvData->inst);
+
+	if (objc < 2) {
+		Tcl_WrongNumArgs(interp, 1, objv, "media");
+		return TCL_ERROR;
+	}
 
 	fprintf (mpvData->debugfh, "number of arguments to media command: %d\n", objc);
 	fflush (mpvData->debugfh); 
@@ -301,30 +310,21 @@ mpvMediaCmd (
     }
 #endif
 
-  rc = TCL_OK;
-  if (mpvData->inst == NULL) {
-    rc = TCL_ERROR;
-  } else {
-    if (mpvData->device != NULL) {
-      status = mpv_set_property (mpvData->inst, "audio-device", MPV_FORMAT_STRING, (void *) mpvData->device);
+	if (mpvData->device != NULL) {
+		status = mpv_set_property (mpvData->inst, "audio-device", MPV_FORMAT_STRING, (void *) mpvData->device);
 #if MPVDEBUG
-      if (mpvData->debugfh != NULL) {
-        fprintf (mpvData->debugfh, "set-ad:status:%d %s\n", status, mpv_error_string(status));
-		fflush (mpvData->debugfh); 
-      }
+		if (mpvData->debugfh != NULL) {
+			fprintf (mpvData->debugfh, "set-ad:status:%d %s\n", status, mpv_error_string(status));
+			fflush (mpvData->debugfh); 
+		}
 #endif
-    }
+	}
 
-    fn = Tcl_GetString(objv[1]);
+	fn = Tcl_GetString(objv[1]);
     if (stat (fn, &statinfo) != 0) {
-      rc = TCL_ERROR;
-      return rc;
-    }
-
-	if (objc == 3) {
-		stt = Tcl_GetString(objv[2]);
-        fprintf (mpvData->debugfh, "stat: %d, stt: %s\n", stat(stt, &statinfo), stt);
-		fflush (mpvData->debugfh); 
+		snprintf (errmsg, sizeof(errmsg), "mediafile %s does not exist", fn); 
+		Tcl_AddErrorInfo (interp, errmsg);
+		return  TCL_ERROR;
     }
 
       /* reset the duration and time */
@@ -334,18 +334,20 @@ mpvMediaCmd (
      * command is executed.
      */
     const char *cmd[] = {"loadfile", fn, "replace", NULL};
-    lstatus = mpv_command (mpvData->inst, cmd);
+    status = mpv_command (mpvData->inst, cmd);
+	if (status) {
+		Tcl_AddErrorInfo (interp, "error executing mpv loadfile command");
+		return TCL_ERROR;	
+	}
+
     dval = 1.0;
-    sstatus = mpv_set_property (mpvData->inst, "speed", MPV_FORMAT_DOUBLE, &dval);
-#if MPVDEBUG
-    if (mpvData->debugfh != NULL) {
-      fprintf (mpvData->debugfh, "loadfile:status:%d %s\n", lstatus, mpv_error_string(lstatus));
-      fprintf (mpvData->debugfh, "speed-1:status:%d %s\n", sstatus, mpv_error_string(sstatus));
-		fflush (mpvData->debugfh); 
-    }
-#endif
-  }
-  return rc;
+    status = mpv_set_property (mpvData->inst, "speed", MPV_FORMAT_DOUBLE, &dval);
+	if (status) {
+		Tcl_AddErrorInfo (interp, "error executing mpv set property command: speed ");
+		return TCL_ERROR;	
+	}
+
+	return TCL_OK;
 }
 
 int
@@ -362,7 +364,6 @@ mpvLoadFileCmd (
 	mpvData_t		*mpvData = (mpvData_t *) cd;
 	char			*fn;
 	char			*arg2;
-	struct stat		statinfo;
 	double			dval;
 	char			errmsg[256];
 
@@ -392,13 +393,24 @@ mpvLoadFileCmd (
 	}
 
     fn = Tcl_GetString(objv[1]);
-    if (stat (fn, &statinfo) != 0) {
-		snprintf (errmsg, sizeof(errmsg), "mediafile %s does not exist", fn); 
-		Tcl_AddErrorInfo (interp, errmsg);
-		return  TCL_ERROR;
-    }
+	/*******
+	* There is no check whether this is a valid file name. Even if it
+	* does not exist the mpv loadfile command does not return an error
+	* but play state returns to stopped as result of end-of-file.
+	* This is not unlike the command line clients of mpv
+	*******/
 
-
+    dval = 1.0;
+    status = mpv_set_property (mpvData->inst, "speed", MPV_FORMAT_DOUBLE, &dval);
+#if MPVDEBUG
+    fprintf (mpvData->debugfh, "loadfile speed-1:status:%d %s\n", status, mpv_error_string(status));
+	fflush (mpvData->debugfh); 
+#endif
+	if (status) {
+		Tcl_AddErrorInfo (interp, "error setting playback speed");
+		return TCL_ERROR;
+	}
+	
 	validflag = 1;
 	status = 0;
 	// If the objc is 3 or 4, the 2nd argument can be a flag
@@ -463,23 +475,11 @@ mpvLoadFileCmd (
 		Tcl_AddErrorInfo (interp, errmsg);
 		return TCL_ERROR;
 	}
-	
 
 	/* reset the duration and time */
 	mpvData->duration = 0.0;
 	mpvData->tm = 0.0;
 
-    dval = 1.0;
-    status = mpv_set_property (mpvData->inst, "speed", MPV_FORMAT_DOUBLE, &dval);
-
-#if MPVDEBUG
-    fprintf (mpvData->debugfh, "loadfile speed-1:status:%d %s\n", status, mpv_error_string(status));
-	fflush (mpvData->debugfh); 
-#endif
-
-	if (status) {
-		return TCL_ERROR;
-	}
 	return TCL_OK;
 }
 

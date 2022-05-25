@@ -94,12 +94,19 @@ These flags are recognized:
 
 *Options* passed to the loadfile command are specified in https://mpv.io/manual/stable/#options
 	and are valid as far as applicable for this extension.  
+	There is no check whether this is a valid file name. Even if it
+	does not exist the mpv loadfile command does not return an error
+	but play state returns to stopped as result of end-of-file.
+	This is not unlike the command line clients of mpv.  
+
 **Note** According to this documentation time can be specified as [hh:[mm:]]ss[.mmm]. However, the
 	implementation of libmpv **only** allows time in the format ss[.mmm].
 	
 **::tclmpv::media** *filename* 
 :	Loads a file *filename* in the player, replaces the current file and start
 	playing immediately.
+	This function can only be used to load media files which can be found on the
+	file system. No http streams etc. When the file does not exist the function returns an error.
 
 **::tclmpv::pause**
 :	Puts the player in pause, provided it is playing. It had not effect when not in playing state.

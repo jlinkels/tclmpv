@@ -9,7 +9,7 @@ Dependencies
 
 Standard development tools should be installed. If essential packages are not
 installed, *configure* generates appropriate messages. In any case, these 
-packages mist be installed:  
+packages must be installed:  
 
 - gcc, make, autoconf, autotools
 - mpv and libmpv-dev   
