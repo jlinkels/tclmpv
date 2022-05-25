@@ -15,6 +15,7 @@ proc check_stopped {} {
 # used as well to exit the program.
 after 1000 check_stopped
 ::tclmpv::media winchester_cathedral_30s.mp3
+#::tclmpv::loadfile http://162.244.80.21:6482
 # The event loop *must* be started to ensure correct event handling
 # in the extension library.
 vwait exit_loop
