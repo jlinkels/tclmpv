@@ -103,6 +103,7 @@ mpvEventHandler (
 	mpvData_t   *mpvData = (mpvData_t *) cd;
 	playstate   stateflag;
 	struct		timespec curtime;
+	int			idle_active;
 
 #if MPVDEBUG
 	clock_gettime (CLOCK_MONOTONIC, &curtime);
@@ -140,25 +141,37 @@ mpvEventHandler (
 #endif
 
 			if (strcmp (prop->name, "time-pos") == 0) {
+				// AFAIK when a time-pos event is received, the player is proceeding
+				if (mpvData->state == PS_BUFFERING) {
+					mpvData->state = PS_PLAYING;
+				}
 				if (prop->format == MPV_FORMAT_DOUBLE) {
 					mpvData->tm = * (double *) prop->data;
 				}
 #if MPVDEBUG
-					fprintf (mpvData->debugfh, "formet: %d, new time-pos: %.2f\n", prop->format, mpvData->tm);
+					fprintf (mpvData->debugfh, "format: %d, new time-pos: %.2f\n", prop->format, mpvData->tm);
 					fflush (mpvData->debugfh); 
 #endif
 			} else if (strcmp (prop->name, "duration") == 0) {
-				if (mpvData->state == PS_BUFFERING) {
-					mpvData->state = PS_PLAYING;
-				}
 				if (prop->format == MPV_FORMAT_DOUBLE) {
 					mpvData->duration = * (double *) prop->data;
 				}
 #if MPVDEBUG
 				fprintf (mpvData->debugfh, "mpv: ev: dur: %.2f\n", mpvData->duration);
 				fflush (mpvData->debugfh); 
-			}
 #endif
+			} else if (strcmp (prop->name, "idle-active") == 0) {
+				if (mpv_get_property(mpvData->inst, "idle-active", MPV_FORMAT_FLAG, &idle_active) == 0) {
+#if MPVDEBUG
+					fprintf (mpvData->debugfh, "mpv: ev: idle_active: %d\n", idle_active);
+					fflush (mpvData->debugfh); 
+#endif
+					if (idle_active) { 
+					// only use this to enter into idle state not to leave it
+						mpvData->state = PS_IDLE;
+					} 
+				}
+			}
 		/***********i END PROPERTY CHANGE ***************/
 		} else if (stateflag != PS_NONE) {
 				  mpvData->state = stateflag;
@@ -932,12 +945,15 @@ mpvInitCmd (
 		mpv_observe_property(mpvData->inst, 0, "duration", MPV_FORMAT_DOUBLE);
 		mpv_observe_property(mpvData->inst, 0, "time-pos", MPV_FORMAT_DOUBLE);
 		mpv_observe_property(mpvData->inst, 0, "filename", MPV_FORMAT_STRING);
+		mpv_observe_property(mpvData->inst, 0, "idle-active", MPV_FORMAT_FLAG);
 
 		/*
 		* From now on, it is expected that events be handled
+		* Call the eventhandler once, it will schedule next periodic call
 		*/
 		mpv_set_wakeup_callback (mpvData->inst, &mpvCallbackHandler, mpvData);
-		mpvData->timerToken = Tcl_CreateTimerHandler (CHKTIMER, &mpvEventHandler, mpvData);
+		//mpvData->timerToken = Tcl_CreateTimerHandler (CHKTIMER, &mpvEventHandler, mpvData);
+		mpvEventHandler (mpvData);
 	}
   }
   if (mpvData->inst != NULL && gstatus == 0) {

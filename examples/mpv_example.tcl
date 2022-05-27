@@ -52,14 +52,13 @@ proc main_loop {} {
 			puts "time: $::loopcnt seconds"
 			puts "initialize the mpv player"
 			::tclmpv::init
-			puts "after 100 ms, ask for the player status"
-			after 100
-			puts "tclmpv state: expected: Idle, actual value: [::tclmpv::state]"
+			puts "tclmpv state: expected: None, actual value: [::tclmpv::state]"
 			puts "mpv library version: [::tclmpv::version]"
 		}
 
 		2 {
 			puts "time: $::loopcnt seconds"
+			puts "tclmpv state: expected: Idle, actual value: [::tclmpv::state]"
 			puts "load a file and start to play"
 			::tclmpv::loadfile soul_bossa_nova_30s.mp3
 		}
@@ -68,6 +67,7 @@ proc main_loop {} {
 			puts "time: $::loopcnt seconds"
 			puts "tclmpv state: expected: Playing, actual value: [::tclmpv::state] "
 			puts "tclmpv duration: expected: 30, actual value: [::tclmpv::duration] "
+			puts "tclmpv time: expected: > 0, actual value: [::tclmpv::gettime] "
 		}
 
 		8 {
