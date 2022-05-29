@@ -16,6 +16,8 @@ tclmpv - Interface to libmpv library for Tcl Scripts
 
 **::tclmpv::duration**
 
+**::tclmpv::eofinfo**
+
 **::tclmpv::gettime**
 
 **::tclmpv::isplay**
@@ -59,13 +61,20 @@ queue. Once appended it cannot be manipulated.
 # COMMANDS
 
 **::tclmpv::close**
-:	Stops the player and relaeses the mpv instance. This stops all event handling and
+:	Stops the player and releases the mpv instance. This stops all event handling and
 	releases all memory and resources. It does not unload the Tcl library. After execution
 	of this command, further calls to tclmpv functions yield an error with the exception
 	of calling ::tclmpv::init.
 
 **::tclmpv::duration**
 :	Returns the duration of the currently playing file in seconds.
+
+**::tclmpv::eofinfo**
+:	Returns a list with the reason and error resulting from the last end-of-file
+	event. The mpvlib *loadfile* command does not return an error when a non-existing file
+	or stream is attempted to be loaded. Only by observing EOF and the associated
+	reason this error can be retrieved. The list consists of 2 strings. The first
+	givng the reason for EOF, the second the error causing the EOF if any.
 
 **::tclmpv::gettime**
 :	Returns the playback position in seconds of the currently playing.
@@ -95,7 +104,7 @@ These flags are recognized:
 *Options* passed to the loadfile command are specified in https://mpv.io/manual/stable/#options
 	and are valid as far as applicable for this extension.  
 	There is no check whether this is a valid file name. Even if it
-	does not exist the mpv loadfile command does not return an error
+	does not exist the mpvlib loadfile command does not return an error
 	but play state returns to stopped as result of end-of-file.
 	This is not unlike the command line clients of mpv.  
 
@@ -152,7 +161,7 @@ for a sufficiently long time, like Idle, Playing or Paused, are reliably reflect
 **idle**
 :	In this mode, no file is played, and the playback core waits for new commands. 
 	This is the normal state the player is in after calling ::tclmpv::init or
-	after the playbaock of the current file has ended.  
+	after the playback of the current file has ended.  
 
 **opening**
 :	A file is being opened.  
@@ -174,9 +183,7 @@ for a sufficiently long time, like Idle, Playing or Paused, are reliably reflect
 	including an error or a request to load a new file. If and end-of-file condition was
 	encountered, the player proceeds to the idle state shortly. After and end-of-file it
 	is not guaranteed the stopped state is observed in the tcl application before the idke
-	state is entered. Future versions of this
-	extensions might include a function to retrieve informatom about the reason
-	playback has stopped for the last time.  
+	state is entered. 
 
 
 # EXAMPLES
