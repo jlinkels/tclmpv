@@ -121,6 +121,7 @@ proc main_loop {} {
 
 		26 {
 			puts "time: $::loopcnt seconds"
+			puts "eof reason: expected: {external action}{success}, actual value [::tclmpv::eofinfo]"
 			puts "tclmpv state: expected: Idle, actual value: [::tclmpv::state] "
 		}
 
@@ -177,7 +178,8 @@ proc main_loop {} {
 		39 {
 			puts "time: $::loopcnt seconds"
 			puts "load a file and start to play"
-			::tclmpv::loadfile winchester_cathedral_30s.mp3
+			# load 10 seconds from the end
+			::tclmpv::loadfile soul_bossa_nova_30s.mp3 start=-10
 		}
 
 		41 {
@@ -185,13 +187,31 @@ proc main_loop {} {
 			# by querying the duration and the actual time
 			puts "time: $::loopcnt seconds"
 			puts "tclmpv duration: expected: 30, actual value: [::tclmpv::duration] "
-			puts "tclmpv time: expected: 2, actual value: [::tclmpv::gettime] "
+			puts "tclmpv time: expected: 22, actual value: [::tclmpv::gettime] "
 			}
 
-		43 {
+		51 {
+			# Check that eofinfo returns the correct information
 			puts "time: $::loopcnt seconds"
-			puts "stop the playback"
-			::tclmpv::stop
+			puts "eof reason: expected: {end of file reached}{success}, actual value [::tclmpv::eofinfo]"
+			puts "tclmpv state: expected: Idle, actual value: [::tclmpv::state] "
+		}
+
+		52 {
+			# loadfile does not check on errors like non-existing files or streams
+			# mpv does not return an error executing the loadfile command
+			# since eof is detected this should give us the information
+			puts "time: $::loopcnt seconds"
+			puts "load non existing file"
+			::tclmpv::loadfile foo.mp3
+			puts "eof reason: expected: {end of file reached}{success}, actual value [::tclmpv::eofinfo]"
+		}
+
+		54 {
+			# Give mpv some time to try and find the file and send the events
+			puts "time: $::loopcnt seconds"
+			puts "eof reason: expected: {error playback abort} {loading failed}, actual value [::tclmpv::eofinfo]"
+			puts "tclmpv state: expected: Idle, actual value: [::tclmpv::state] "
 		}
 
 		default {
@@ -201,7 +221,7 @@ proc main_loop {} {
 
 	}
 	incr ::loopcnt
-	if { $::loopcnt > 45 } { set ::forever 1}
+	if { $::loopcnt > 55 } { set ::forever 1}
 	after 1000 main_loop
 }
 

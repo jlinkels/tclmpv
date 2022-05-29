@@ -14,6 +14,14 @@
 
 #define MPVDEBUG 1
 
+/*
+* New fields were added to  mpv_event_end_file record in 
+* the client API for version 1.108.
+* We want to keep the code for future use, but on Debian 10
+* it won't compile yet
+*/
+#define MPV_CLIENT_GT_1108 0
+
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -70,6 +78,17 @@ stateToStr (
   return tptr;
 }
 
+const char 
+*mpv_efr_string(
+	mpv_end_file_reason reason
+	)
+// Copied and adapted from mpv/player/client.c
+{
+    if ((unsigned)reason >= sizeof(efr_table)/sizeof(efr_table[0]))
+        return NULL;
+    return efr_table[reason];
+}
+
 /* executed in some arbitrary thread */
 void
 mpvCallbackHandler (
@@ -79,20 +98,6 @@ mpvCallbackHandler (
   mpvData_t     *mpvData = (mpvData_t *) cd;
 
   mpvData->hasEvent = 1;
-}
-
-void mpvEventTick (
-	ClientData cd
-)
-{
-	struct		timespec curtime;
-	mpvData_t   *mpvData = (mpvData_t *) cd;
-
-	clock_gettime (CLOCK_MONOTONIC, &curtime);
-	fprintf (mpvData->debugfh, "[%ld.%ld] mpv: mpvEventTick entered \n", curtime.tv_sec, curtime.tv_nsec);
-	fflush (mpvData->debugfh); 
-	
-	mpvData->tickToken = Tcl_CreateTimerHandler (CHKTIMER, &mpvEventTick, mpvData);
 }
 
 void
@@ -127,6 +132,23 @@ mpvEventHandler (
 	fprintf (mpvData->debugfh, "[%ld.%ld] mpv_event_name: %s\n", curtime.tv_sec, curtime.tv_nsec, mpv_event_name (event->event_id));
 
 	while (event->event_id != MPV_EVENT_NONE) {
+		
+		if (event->event_id == MPV_EVENT_END_FILE ) {
+			mpv_event_end_file *end_file = (mpv_event_end_file *) event->data;
+			fprintf (mpvData->debugfh, "[%ld.%ld] mpv end file: reason %d, %s\n", \
+				curtime.tv_sec, curtime.tv_nsec, (int) end_file->reason, mpv_efr_string(end_file->reason));
+			fprintf (mpvData->debugfh, "[%ld.%ld] mpv end file: error %d, %s\n", \
+				curtime.tv_sec, curtime.tv_nsec, (int) end_file->error, mpv_error_string(end_file->error));
+			mpvData->end_file = (mpv_event_end_file) {.reason = end_file->reason, .error = end_file->error};
+#if MPV_CLIENT_GT_1108
+			fprintf (mpvData->debugfh, "[%ld.%ld] mpv end file: playlist entry id %ld\n", \
+				curtime.tv_sec, curtime.tv_nsec, (int) end_file->playlist_entry_id);
+			fprintf (mpvData->debugfh, "[%ld.%ld] mpv end file: playlist insert id %ld\n", \
+				curtime.tv_sec, curtime.tv_nsec, (int) end_file->playlist_insert_id);
+			fprintf (mpvData->debugfh, "[%ld.%ld] mpv end file: playlist insert num entries %d\n", \
+				curtime.tv_sec, curtime.tv_nsec, (int) end_file->playlist_insert_num_entries);
+#endif
+		}
 
 		if (event->event_id == MPV_EVENT_PROPERTY_CHANGE) {
 
@@ -214,6 +236,32 @@ mpvDurationCmd (
 
     tm = mpvData->duration;
     Tcl_SetObjResult (interp, Tcl_NewDoubleObj (tm));
+	return TCL_OK;
+}
+
+int
+mpvEofInfoCmd (
+	ClientData cd,
+	Tcl_Interp* interp,
+	int objc,
+	Tcl_Obj * const objv[]
+	)
+{
+	mpvData_t	*mpvData = (mpvData_t *) cd;
+	
+	RETURN_IF_NOT_INIT (mpvData->inst);
+
+	if (objc != 1) {
+		Tcl_WrongNumArgs(interp, 1, objv, "");
+		return TCL_ERROR;
+	}
+
+	Tcl_Obj *list = Tcl_NewListObj(0, NULL);
+	Tcl_Obj *str = Tcl_NewStringObj(mpv_efr_string (mpvData->end_file.reason), -1);
+	Tcl_ListObjAppendElement(interp, list, str);	
+	str = Tcl_NewStringObj(mpv_error_string (mpvData->end_file.error), -1);
+	Tcl_ListObjAppendElement(interp, list, str);	
+	Tcl_SetObjResult (interp, list);
 	return TCL_OK;
 }
 
@@ -1085,11 +1133,9 @@ Tclmpv_Init (Tcl_Interp *interp)
   mpvData->duration = 0.0;
   mpvData->tm = 0.0;
   mpvData->hasEvent = 0;
-  //mpvData->timerToken = Tcl_CreateTimerHandler (CHKTIMER, &mpvEventHandler, mpvData);
   mpvData->timerToken = NULL;
-  //mpvData->tickToken = Tcl_CreateTimerHandler (CHKTIMER, &mpvEventTick, mpvData);
-  mpvData->tickToken = NULL;
   mpvData->debugfh = NULL;
+  mpvData->end_file = (mpv_event_end_file) {.reason = 0, .error = 0};
   for (i = 0; i < stateMapIdxMax; ++i) {
     mpvData->stateMapIdx[i] = 0;
   }

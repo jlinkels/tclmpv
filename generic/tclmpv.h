@@ -39,6 +39,15 @@ static const playStateMap_t playStateMap[] = {
 };
 #define playStateMapMax (sizeof(playStateMap)/sizeof(playStateMap_t))
 
+static const char *const efr_table[] = {
+// Table copied and adapted from mpv/player/client.c
+	[MPV_END_FILE_REASON_EOF] = "end of file reached",
+    [MPV_END_FILE_REASON_STOP] = "stop request",
+    [MPV_END_FILE_REASON_QUIT]= "quit request",
+    [MPV_END_FILE_REASON_ERROR]= "error playback abort",
+    [MPV_END_FILE_REASON_REDIRECT] = "file redirect",
+};
+
 typedef struct {
   mpv_event_id          state;
   const char *          name;
@@ -64,29 +73,30 @@ static const stateMap_t stateMap[] = {
 
 #define stateMapIdxMax 40 /* mpv currently has 24 states coded */
 typedef struct {
-  Tcl_Interp            *interp;
-  mpv_handle            *inst;
-  char                  version [40];
-  //mpv_event_id          state;
-  playstate				state;	
-  int                   argc;
-  const char            **argv;
-  const char            *device;
-  double                duration;
-  double                tm;
-  int                   paused;
-  int                   hasEvent;       /* flag to process mpv event */
-  Tcl_TimerToken        timerToken;
-  Tcl_TimerToken        tickToken;
-  int                   stateMapIdx [stateMapIdxMax];
-  FILE                  *debugfh;
+	 Tcl_Interp					*interp;
+	 mpv_handle					*inst;
+	 char						version [40];
+	 playstate					state;	
+	 int						argc;
+	 const char					**argv;
+	 const char					*device;
+	 double						duration;
+	 double						tm;
+	 int						paused;
+	 int						hasEvent;       /* flag to process mpv event */
+	 Tcl_TimerToken				timerToken;
+	 int						stateMapIdx [stateMapIdxMax];
+	 struct mpv_event_end_file	end_file;
+	 FILE		                *debugfh;
 } mpvData_t;
 
 const char * mpvStateToStr (mpv_event_id state);
 const char * stateToStr (playstate state);
+const char *mpv_efr_string(mpv_end_file_reason reason);
 void mpvCallbackHandler (void *cd);
 void mpvEventHandler (ClientData cd);
 int mpvDurationCmd (ClientData cd, Tcl_Interp* interp, int objc, Tcl_Obj * const objv[]);
+int mpvEofInfoCmd (ClientData cd, Tcl_Interp* interp, int objc, Tcl_Obj * const objv[]);
 int mpvGetTimeCmd ( ClientData cd, Tcl_Interp* interp, int objc, Tcl_Obj * const objv[]);
 int mpvIsPlayCmd ( ClientData cd, Tcl_Interp* interp, int objc, Tcl_Obj * const objv[]);
 int mpvMediaCmd ( ClientData cd, Tcl_Interp* interp, int objc, Tcl_Obj * const objv[]);
@@ -112,6 +122,7 @@ static const EnsembleData mpvCmdMap[] = {
   { "audiodevset",  mpvAudioDevSetCmd },
   { "close",        mpvReleaseCmd },
   { "duration",     mpvDurationCmd },
+  { "eofinfo",      mpvEofInfoCmd },
   { "gettime",      mpvGetTimeCmd },
   { "init",         mpvInitCmd },
   { "haveaudiodevlist", mpvHaveAudioDevListCmd },
