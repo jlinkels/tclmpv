@@ -1,6 +1,6 @@
-% tclmpv 0.12 | Interface to libmpv for TCL scripts 
+% tclmpv 0.14 | Interface to libmpv for TCL scripts 
 % Original code by Brad Lanam 
-% 0.12
+% 0.14
 
 
 # NAME
@@ -10,7 +10,7 @@ tclmpv - Interface to libmpv library for Tcl Scripts
 
 # SYNOPSIS
 
-**package require libmpv** ?0.12?
+**package require libmpv** ?0.14?
 
 **::tclmpv::close**
 

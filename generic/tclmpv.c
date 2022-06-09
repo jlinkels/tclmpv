@@ -12,7 +12,7 @@
  * 
  */
 
-#define MPVDEBUG 1
+#define MPVDEBUG 0
 
 /*
 * New fields were added to  mpv_event_end_file record in 
@@ -129,17 +129,20 @@ mpvEventHandler (
 	mpv_event *event = mpv_wait_event (mpvData->inst, 0.0);
 	stateflag = stateMap[(int) mpvData->stateMapIdx[event->event_id]].stateflag;
 	clock_gettime (CLOCK_MONOTONIC, &curtime);
+#if MPVDEBUG
 	fprintf (mpvData->debugfh, "[%ld.%ld] mpv_event_name: %s\n", curtime.tv_sec, curtime.tv_nsec, mpv_event_name (event->event_id));
+#endif
 
 	while (event->event_id != MPV_EVENT_NONE) {
 		
 		if (event->event_id == MPV_EVENT_END_FILE ) {
 			mpv_event_end_file *end_file = (mpv_event_end_file *) event->data;
+			mpvData->end_file = (mpv_event_end_file) {.reason = end_file->reason, .error = end_file->error};
+#if MPVDEBUG
 			fprintf (mpvData->debugfh, "[%ld.%ld] mpv end file: reason %d, %s\n", \
 				curtime.tv_sec, curtime.tv_nsec, (int) end_file->reason, mpv_efr_string(end_file->reason));
 			fprintf (mpvData->debugfh, "[%ld.%ld] mpv end file: error %d, %s\n", \
 				curtime.tv_sec, curtime.tv_nsec, (int) end_file->error, mpv_error_string(end_file->error));
-			mpvData->end_file = (mpv_event_end_file) {.reason = end_file->reason, .error = end_file->error};
 #if MPV_CLIENT_GT_1108
 			fprintf (mpvData->debugfh, "[%ld.%ld] mpv end file: playlist entry id %ld\n", \
 				curtime.tv_sec, curtime.tv_nsec, (int) end_file->playlist_entry_id);
@@ -147,6 +150,7 @@ mpvEventHandler (
 				curtime.tv_sec, curtime.tv_nsec, (int) end_file->playlist_insert_id);
 			fprintf (mpvData->debugfh, "[%ld.%ld] mpv end file: playlist insert num entries %d\n", \
 				curtime.tv_sec, curtime.tv_nsec, (int) end_file->playlist_insert_num_entries);
+#endif
 #endif
 		}
 
@@ -360,11 +364,11 @@ mpvMediaCmd (
 		return TCL_ERROR;
 	}
 
+
+#if MPVDEBUG
 	fprintf (mpvData->debugfh, "number of arguments to media command: %d\n", objc);
 	fflush (mpvData->debugfh); 
 
-
-#if MPVDEBUG
     if (mpvData->debugfh != NULL) {
       fprintf (mpvData->debugfh, "mpvData->inst: %p, mpvData->device: %s\n", (void *) mpvData->inst, mpvData->device);
 		fflush (mpvData->debugfh); 
@@ -746,8 +750,8 @@ mpvSeekCmd (
 #if MPVDEBUG
 		fprintf (mpvData->debugfh, "seek-%s:status:%d %s\n", spos, rc, mpv_error_string(rc));
 		fflush (mpvData->debugfh );
-	}
 #endif
+	}
 	/* The statement below was in the original code.
 	*	However it is useless because mpvData->tm is only
 	*	set after mpv raises an event AND the event is catched
@@ -820,9 +824,6 @@ mpvQuitCmd (
   int       rc;
   int       status;
   mpvData_t *mpvData = (mpvData_t *) cd;
-
-      fprintf (mpvData->debugfh, "mpvQuitCmd entered\n");
-		fflush (mpvData->debugfh);
 
   rc = TCL_OK;
   if (mpvData->inst == NULL) {
