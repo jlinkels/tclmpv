@@ -20,6 +20,7 @@ Building
 
 Clone the repository in a development directory. Run  
 
+	autoconf
 	./configure  
 	make  
 	sudo make install  
