@@ -64,10 +64,7 @@ static const stateMap_t stateMap[] = {
   { MPV_EVENT_PLAYBACK_RESTART, "playafterseek", PS_NONE },
   { MPV_EVENT_END_FILE,         "stopped", PS_STOPPED },
   { MPV_EVENT_SHUTDOWN,         "ended", PS_STOPPED },
-    /* these next three are only for debugging */
-  { MPV_EVENT_TRACKS_CHANGED,   "tracks-changed", PS_NONE },
-  { MPV_EVENT_AUDIO_RECONFIG,   "audio-reconf", PS_NONE },
-  { MPV_EVENT_METADATA_UPDATE,  "metadata-upd", PS_NONE }
+  { MPV_EVENT_AUDIO_RECONFIG,   "audio-reconf", PS_NONE }
 };
 #define stateMapMax (sizeof(stateMap)/sizeof(stateMap_t))
 
