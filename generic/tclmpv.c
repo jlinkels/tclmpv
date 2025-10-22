@@ -365,7 +365,7 @@ mpvMediaCmd (
 	}
 
 
-#if MPVDEBUG
+	#if MPVDEBUG
 	fprintf (mpvData->debugfh, "number of arguments to media command: %d\n", objc);
 	fflush (mpvData->debugfh); 
 
@@ -373,16 +373,16 @@ mpvMediaCmd (
       fprintf (mpvData->debugfh, "mpvData->inst: %p, mpvData->device: %s\n", (void *) mpvData->inst, mpvData->device);
 		fflush (mpvData->debugfh); 
     }
-#endif
+	#endif
 
 	if (mpvData->device != NULL) {
 		status = mpv_set_property (mpvData->inst, "audio-device", MPV_FORMAT_STRING, (void *) mpvData->device);
-#if MPVDEBUG
+	#if MPVDEBUG
 		if (mpvData->debugfh != NULL) {
 			fprintf (mpvData->debugfh, "set-ad:status:%d %s\n", status, mpv_error_string(status));
 			fflush (mpvData->debugfh); 
 		}
-#endif
+	#endif
 	}
 
 	fn = Tcl_GetString(objv[1]);
@@ -431,6 +431,8 @@ mpvLoadFileCmd (
 	char			*arg2;
 	double			dval;
 	char			errmsg[256];
+	unsigned int	ivers;
+	char			lf_opt_4 = 0; //loadfile uses the options as 4th argument (since mpv 0.38)
 
 	/********
 	Call with: ::tcl::tclmpv::loadfile filename ?flags? ?options?
@@ -467,13 +469,34 @@ mpvLoadFileCmd (
 
     dval = 1.0;
     status = mpv_set_property (mpvData->inst, "speed", MPV_FORMAT_DOUBLE, &dval);
-#if MPVDEBUG
+	#if MPVDEBUG
     fprintf (mpvData->debugfh, "loadfile speed-1:status:%d %s\n", status, mpv_error_string(status));
 	fflush (mpvData->debugfh); 
-#endif
+	#endif
 	if (status) {
 		Tcl_AddErrorInfo (interp, "error setting playback speed");
 		return TCL_ERROR;
+	}
+
+	/*******
+	* Since mpv version 0.38 there is a change in the argument list
+	* to call loadfile.
+	* A third argument (insertion index) was added before the option
+	* list. This breaks all calls to loadfile which uses the option
+	* list. When loadfile is called with an option list, a third argument
+	* "-1" must be added.
+	* This is a change in mpv, not in the mpv API, which remains the same.
+	* Only the contents of the string passed to mpv changes, not the command
+	* itself.
+	* With mpv version 0.38, API version 2.3 was released. So we will check here
+	* for API version 2.3 and add this third parameter.
+	* Format of version number in /usr/include/mpv/client.h
+	*******/
+	ivers = mpv_client_api_version();
+	if (((ivers >> 16) >= 2) && ((ivers & 0x00FF) >=3)) {
+		lf_opt_4 = 1;
+	} else {
+		lf_opt_4 = 0;
 	}
 	
 	validflag = 1;
@@ -484,7 +507,7 @@ mpvLoadFileCmd (
 		if (strcmp (arg2, "replace") &&
 			strcmp (arg2, "append") &&
 			strcmp (arg2, "append-play")) {
-		//One of the values did not match, so we don't have a flag
+		//None of the values did match, so we don't have a flag
 		validflag = 0;
 		}
 		// If objc is 3 and arg2 is not a valid flag it is an option
@@ -494,25 +517,38 @@ mpvLoadFileCmd (
 			if (validflag) {
 				const char* cmd[] = {"loadfile", fn, arg2, NULL};
 				status = mpv_command (mpvData->inst, cmd);
-#if MPVDEBUG
+				#if MPVDEBUG
 				fprintf (mpvData->debugfh, "loadfile: valid flag %s;\n", arg2);
-#endif
+				fflush (mpvData->debugfh); 
+				#endif
 			} else { 
 			/* Not a valid flag so it must be an option */
-				const char* cmd[] = {"loadfile", fn, "replace", arg2, NULL};
-				status = mpv_command (mpvData->inst, cmd);
-#if MPVDEBUG
-				fprintf (mpvData->debugfh, "loadfile: not a valid flag, options passed: %s;\n", arg2);
-#endif
+				if (lf_opt_4 == 1) {
+					const char* cmd[] = {"loadfile", fn, "replace", "-1", arg2, NULL};
+					status = mpv_command (mpvData->inst, cmd);
+				} else {
+					const char* cmd[] = {"loadfile", fn, "replace",  arg2, NULL};
+					status = mpv_command (mpvData->inst, cmd);
+				}
+				#if MPVDEBUG
+				fprintf (mpvData->debugfh, "loadfile: no valid flags. options passed: %s;\n", arg2);
+				fflush (mpvData->debugfh); 
+				#endif
 			}
 		} else {
-			/* Number of parameters > 2 and < 5 so must be 4 */
+			/* Number of parameters > 2, < 5 and not 3 so must be 4 */
 			if (validflag) {
-				const char* cmd[] = {"loadfile", fn,  arg2, Tcl_GetString(objv[3]), NULL};
-				status = mpv_command (mpvData->inst, cmd);
-#if MPVDEBUG
+				if (lf_opt_4 == 1) {
+					const char* cmd[] = {"loadfile", fn,  arg2, "-1", Tcl_GetString(objv[3]), NULL};
+					status = mpv_command (mpvData->inst, cmd);
+				} else {
+					const char* cmd[] = {"loadfile", fn,  arg2, Tcl_GetString(objv[3]), NULL};
+					status = mpv_command (mpvData->inst, cmd);
+				}
+				#if MPVDEBUG
 				fprintf (mpvData->debugfh, "loadfile: valid flag: %s,  options passed: %s\n", arg2, Tcl_GetString(objv[3]));
-#endif
+				fflush (mpvData->debugfh); 
+				#endif
 			} else {
 				rc = TCL_ERROR;
 			}
@@ -521,15 +557,30 @@ mpvLoadFileCmd (
 		/* no flags, no options */
 		const char* cmd[] = {"loadfile", fn, "replace", NULL};
 		status = mpv_command (mpvData->inst, cmd);
-#if MPVDEBUG
+		#if MPVDEBUG
 		fprintf (mpvData->debugfh, "loadfile: no flags, no options\n");
-#endif
+		fflush (mpvData->debugfh); 
+		#endif
 	} 
 
-#if MPVDEBUG
+	/******** cmd is out of scope here. This logging will be enabled once *****
+	/         I find a better way to compose cmd 
+	#if MPVDEBUG
+	int i = 0;
+	fprintf (mpvData->debugfh, "loadfile: actual command passed to mpv_command: \n");
+	while (cmd[i] != NULL) {
+		fprintf (mpvData->debugfh, "[%d]: %s, ", i, cmd[i] );
+		i++;
+	}	
+	fprintf (mpvData->debugfh, "\n" );
+	fflush (mpvData->debugfh); 
+	#endif
+	***************************************************************************/
+
+	#if MPVDEBUG
     fprintf (mpvData->debugfh, "loadfile: mpv_command status:%d %s\n", status, mpv_error_string(status));
 	fflush (mpvData->debugfh); 
-#endif
+	#endif
 
 	if (rc) {
 		Tcl_AddErrorInfo (interp, "invalid flag specified, must be \"replace\", \"append\" or \"append-play\"");
@@ -540,6 +591,7 @@ mpvLoadFileCmd (
 		Tcl_AddErrorInfo (interp, errmsg);
 		return TCL_ERROR;
 	}
+	(void)status;
 
 	/* reset the duration and time */
 	mpvData->duration = 0.0;
@@ -586,13 +638,13 @@ mpvPauseCmd (
       int val = 1;
       status = mpv_set_property (mpvData->inst, "pause", MPV_FORMAT_FLAG, &val);
 	  result = mpv_get_property (mpvData->inst, "pause", MPV_FORMAT_FLAG, &ppause);
-#if MPVDEBUG
+	  #if MPVDEBUG
       if (mpvData->debugfh != NULL) {
         fprintf (mpvData->debugfh, "pause-%d:status:%d %s\n", val, status, mpv_error_string(status));
         fprintf (mpvData->debugfh, "(pause) retrieved ppause:%d, error: %d %s\n", ppause, result, mpv_error_string(status));
 		fflush (mpvData->debugfh);
       }
-#endif
+	  #endif
       mpvData->paused = 1;
       mpvData->state = PS_PAUSED;
     } else if (mpvData->state == PS_PAUSED &&
@@ -600,17 +652,19 @@ mpvPauseCmd (
       int val = 0;
       status = mpv_set_property (mpvData->inst, "pause", MPV_FORMAT_FLAG, &val);
 	  result = mpv_get_property (mpvData->inst, "pause", MPV_FORMAT_FLAG, &ppause);
-#if MPVDEBUG
+	#if MPVDEBUG
       if (mpvData->debugfh != NULL) {
         fprintf (mpvData->debugfh, "unpause-%d:status:%d %s\n", val, status, mpv_error_string(status));
         fprintf (mpvData->debugfh, "(unpause) retrieved ppause:%d, error: %d %s\n", ppause, result, mpv_error_string(status));
 		fflush (mpvData->debugfh);
       }
-#endif
+	#endif
       mpvData->paused = 0;
       mpvData->state = PS_PLAYING;
     }
   }
+  (void)result;
+  (void)status;
   return rc;
 }
 
@@ -655,6 +709,7 @@ mpvPlayCmd (
       mpvData->state = PS_PLAYING;
     }
   }
+  (void)status;
   return rc;
 }
 
@@ -703,6 +758,7 @@ mpvRateCmd (
 #endif
     Tcl_SetObjResult (interp, Tcl_NewDoubleObj ((double) rate));
   }
+  (void)status;
   return rc;
 }
 
@@ -804,12 +860,13 @@ mpvStopCmd (
     /* difference: vlc's stop command does not clear the playlist */
     const char *cmd[] = {"stop", NULL};
     status = mpv_command (mpvData->inst, cmd);
-#if MPVDEBUG
+	#if MPVDEBUG
     if (mpvData->debugfh != NULL) {
       fprintf (mpvData->debugfh, "stop:status:%d %s\n", status, mpv_error_string(status));
     }
-#endif
+	#endif
   }
+  (void)status;
   return rc;
 }
 
@@ -832,11 +889,12 @@ mpvQuitCmd (
     /* quits the player */
     const char *cmd[] = {"quit", 0,  NULL};
     status = mpv_command (mpvData->inst, cmd);
-#if MPVDEBUG
+	#if MPVDEBUG
       fprintf (mpvData->debugfh, "quit:status:%d %s\n", status, mpv_error_string(status));
 		fflush (mpvData->debugfh);
-#endif
+	#endif
   }
+  (void)status;
   return rc;
 }
 
@@ -1203,3 +1261,4 @@ Tclmpv_Init (Tcl_Interp *interp)
 
   return TCL_OK;
 }
+
