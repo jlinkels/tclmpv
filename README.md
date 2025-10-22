@@ -1,7 +1,7 @@
 TCLMPV
 ============
 
-This package adds support for accessing libpmpv from with Tclsh or Wish.
+This package adds support for accessing libmpv from with Tclsh or Wish.
 Only audio files are supported and playlists are not used.
 
 Dependencies
@@ -33,7 +33,7 @@ To have make install in the correct directory, run configure with:
 Debugging
 ---------
 
-Setting **#MPVDEBUG 1** in tclmpv.c generates a mpvdebug.txt file with debug messages 
+Setting **#MPVDEBUG 1** in tclmpv.c generates an mpvdebug.txt file with debug messages 
 in the directory where the Tcl script is run.  
 
 Examples
@@ -44,8 +44,8 @@ In example/mpv_example.tcl most library functions are called.
 Platforms
 ---------
 
-This package had been developed and tested on Debian 10. It should run on
-Windows and Apple, but it is not tested in any way.  
+This package had been developed and tested on Debian 10 and Debian 13. 
+It should run on Windows and Apple, but it is not tested in any way.  
 
 
 License
